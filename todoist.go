@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -186,6 +187,23 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 	}
 	ts.syncToken = data.SyncToken
 	return nil
+}
+
+// CreateItem creates an item, without going through the full sync workflow.
+func (ts *Syncer) CreateItem(ctx context.Context, item Item) error {
+	vs := url.Values{
+		"content":    []string{item.Content},
+		"project_id": []string{item.ProjectID},
+		"priority":   []string{strconv.Itoa(item.Priority)},
+	}
+	if item.Description != "" {
+		vs.Set("description", item.Description)
+	}
+	if item.Due != nil {
+		vs.Set("date_string", item.Due.Date)
+	}
+	err := ts.post(ctx, "/sync/v9/items/add", vs, &struct{}{})
+	return err
 }
 
 func (ts *Syncer) post(ctx context.Context, path string, params url.Values, dst interface{}) error {
