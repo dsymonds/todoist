@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -46,6 +47,10 @@ type Item struct {
 	Responsible *string `json:"responsible_uid,omitempty"`
 	Checked     bool    `json:"checked,omitempty"`
 	Due         *Due    `json:"due,omitempty"`
+
+	ParentID       string `json:"parent_id,omitempty"`
+	ChildRemaining int    `json:"-"`
+	ChildCompleted int    `json:"-"`
 }
 
 // Due represents a task's due date, in a few different possible formats.
@@ -145,17 +150,26 @@ func NewSyncer(apiToken string) *Syncer {
 
 // Sync triggers a synchronisation of data, doing a partial sync where possible.
 func (ts *Syncer) Sync(ctx context.Context) error {
+	type compInfo struct {
+		// One of these should be set:
+		ProjectID string `json:"project_id"`
+		SectionID string `json:"section_id"`
+		ItemID    string `json:"item_id"`
+
+		NumItems int `json:"completed_items"`
+	}
 	var data struct {
 		SyncToken     string         `json:"sync_token"`
 		FullSync      bool           `json:"full_sync"`
 		Projects      []Project      `json:"projects"`
 		Collaborators []Collaborator `json:"collaborators"`
 		Items         []Item         `json:"items"`
+		Completed     []compInfo     `json:"completed_info"`
 	}
 	err := ts.post(ctx, "/sync/v9/sync", url.Values{
 		"sync_token": []string{ts.syncToken},
 		// TODO: sync more, and permit configuring what things to sync.
-		"resource_types": []string{`["projects","items","collaborators"]`},
+		"resource_types": []string{`["projects","items","collaborators","completed_info"]`},
 	}, &data)
 	if err != nil {
 		return err
@@ -176,6 +190,9 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		ts.Collaborators[c.ID] = c
 	}
 	for _, item := range data.Items {
+		if item.ParentID != "" {
+		}
+		item.ChildRemaining = 0 // Recomputed below.
 		if item.Checked {
 			delete(ts.Items, item.ID)
 		} else {
@@ -185,7 +202,39 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 			ts.Items[item.ID] = item
 		}
 	}
+	for _, comp := range data.Completed {
+		if comp.ItemID == "" { // only handle completion counts for items
+			continue
+		}
+		item, ok := ts.Items[comp.ItemID]
+		if !ok {
+			// This really shouldn't happen.
+			// TODO: Or can it happen for completed items?
+			log.Printf("WARNING: Todoist reported completion info for unknown item %s", comp.ItemID)
+			continue
+		}
+		item.ChildCompleted = comp.NumItems
+		ts.Items[comp.ItemID] = item
+	}
 	ts.syncToken = data.SyncToken
+
+	// Recompute pending children.
+	// The ChildRemaining field for each item was cleared in the loop over data.Items above.
+	for _, item := range ts.Items {
+		if item.ParentID == "" {
+			continue
+		}
+		p, ok := ts.Items[item.ParentID]
+		if !ok {
+			// This really shouldn't happen.
+			// TODO: Or can it happen for completed items?
+			log.Printf("WARNING: Todoist item %q has parent %s that we don't know about", item.Content, item.ParentID)
+			continue
+		}
+		p.ChildRemaining++
+		ts.Items[item.ParentID] = p
+	}
+
 	return nil
 }
 
