@@ -190,9 +190,6 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		ts.Collaborators[c.ID] = c
 	}
 	for _, item := range data.Items {
-		if item.ParentID != "" {
-		}
-		item.ChildRemaining = 0 // Recomputed below.
 		if item.Checked {
 			delete(ts.Items, item.ID)
 		} else {
@@ -219,9 +216,12 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 	ts.syncToken = data.SyncToken
 
 	// Recompute pending children.
-	// The ChildRemaining field for each item was cleared in the loop over data.Items above.
+	for id, item := range ts.Items {
+		item.ChildRemaining = 0
+		ts.Items[id] = item
+	}
 	for _, item := range ts.Items {
-		if item.ParentID == "" {
+		if item.ParentID == "" { // TODO: skip checked if we start tracking them
 			continue
 		}
 		p, ok := ts.Items[item.ParentID]
