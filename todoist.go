@@ -42,7 +42,7 @@ type Item struct {
 	ProjectID   string `json:"project_id,omitempty"`
 	Content     string `json:"content,omitempty"`     // title of task
 	Description string `json:"description,omitempty"` // secondary info
-	Priority    int    `json:"priority,omitempty"`
+	Priority    int    `json:"priority,omitempty"`    // 4 is the highest priority, 1 is the lowest
 
 	Responsible *string `json:"responsible_uid,omitempty"`
 	Checked     bool    `json:"checked,omitempty"`
