@@ -249,9 +249,9 @@ func (ts *Syncer) CreateItem(ctx context.Context, item Item) error {
 		vs.Set("description", item.Description)
 	}
 	if item.Due != nil {
-		vs.Set("date_string", item.Due.Date)
+		vs.Set("due_datetime", item.Due.Date)
 	}
-	err := ts.post(ctx, "/sync/v9/items/add", vs, &struct{}{})
+	err := ts.post(ctx, "/rest/v2/tasks", vs, &struct{}{})
 	return err
 }
 
