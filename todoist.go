@@ -281,3 +281,14 @@ func (ts *Syncer) post(ctx context.Context, path string, params url.Values, dst 
 	}
 	return nil
 }
+
+// ProjectByName returns the named project.
+// This will only work after a Sync invocation.
+func (s *Syncer) ProjectByName(name string) (Project, bool) {
+	for _, proj := range s.Projects {
+		if proj.Name == name {
+			return proj, true
+		}
+	}
+	return Project{}, false
+}
