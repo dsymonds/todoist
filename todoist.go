@@ -31,9 +31,8 @@ type Project struct {
 type Collaborator struct {
 	ID string `json:"id"`
 
+	Email    string `json:"email"`
 	FullName string `json:"full_name"`
-
-	// TODO: email
 }
 
 // Item represents a Todoist item (task).
