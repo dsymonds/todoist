@@ -250,6 +250,9 @@ func (ts *Syncer) CreateItem(ctx context.Context, item Item) error {
 	if item.Due != nil {
 		vs.Set("due_datetime", item.Due.Date)
 	}
+	if item.Responsible != nil {
+		vs.Set("assignee_id", *item.Responsible)
+	}
 	err := ts.post(ctx, "/rest/v2/tasks", vs, &struct{}{})
 	return err
 }
