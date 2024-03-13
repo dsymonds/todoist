@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -166,7 +167,7 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		Items         []Item         `json:"items"`
 		Completed     []compInfo     `json:"completed_info"`
 	}
-	err := ts.post(ctx, "/sync/v9/sync", url.Values{
+	err := ts.postForm(ctx, "/sync/v9/sync", url.Values{
 		"sync_token": []string{ts.syncToken},
 		// TODO: sync more, and permit configuring what things to sync.
 		"resource_types": []string{`["projects","items","collaborators","completed_info"]`},
@@ -254,18 +255,21 @@ func (ts *Syncer) CreateItem(ctx context.Context, item Item) error {
 	if item.Responsible != nil {
 		vs.Set("assignee_id", *item.Responsible)
 	}
-	err := ts.post(ctx, "/rest/v2/tasks", vs, &struct{}{})
+	err := ts.postForm(ctx, "/rest/v2/tasks", vs, &struct{}{})
 	return err
 }
 
-func (ts *Syncer) post(ctx context.Context, path string, params url.Values, dst interface{}) error {
-	form := strings.NewReader(params.Encode())
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.todoist.com"+path, form)
+func (ts *Syncer) postForm(ctx context.Context, path string, params url.Values, dst interface{}) error {
+	return ts.post(ctx, path, strings.NewReader(params.Encode()), "application/x-www-form-urlencoded", dst)
+}
+
+func (ts *Syncer) post(ctx context.Context, path string, reqBody io.Reader, ct string, dst interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.todoist.com"+path, reqBody)
 	if err != nil {
 		return fmt.Errorf("constructing HTTP request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+ts.apiToken)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", ct)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
