@@ -6,6 +6,7 @@ The Syncer is likely the place to start for interacting with the API.
 package todoist
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -263,6 +264,14 @@ func (ts *Syncer) postForm(ctx context.Context, path string, params url.Values, 
 	return ts.post(ctx, path, strings.NewReader(params.Encode()), "application/x-www-form-urlencoded", dst)
 }
 
+func (ts *Syncer) postJSON(ctx context.Context, path string, reqBody, dst interface{}) error {
+	b, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshaling JSON body: %w", err)
+	}
+	return ts.post(ctx, path, bytes.NewReader(b), "application/json", dst)
+}
+
 func (ts *Syncer) post(ctx context.Context, path string, reqBody io.Reader, ct string, dst interface{}) error {
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.todoist.com"+path, reqBody)
 	if err != nil {
@@ -298,4 +307,16 @@ func (s *Syncer) ProjectByName(name string) (Project, bool) {
 		}
 	}
 	return Project{}, false
+}
+
+// Assign assigns a task to the given UID.
+// If it is the empty string, the item is unassigned.
+func (s *Syncer) Assign(ctx context.Context, item Item, assignee string) error {
+	var req struct {
+		AssigneeID *string `json:"assignee_id"`
+	}
+	if assignee != "" {
+		req.AssigneeID = &assignee
+	}
+	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID), req, &struct{}{})
 }
