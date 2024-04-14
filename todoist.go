@@ -21,6 +21,7 @@ import (
 )
 
 // See https://developer.todoist.com/sync/v9/ for the reference for types and protocols.
+// https://developer.todoist.com/rest/v2/ is also used for several operations.
 
 // Project represents a Todoist project.
 type Project struct {
@@ -319,4 +320,16 @@ func (s *Syncer) Assign(ctx context.Context, item Item, assignee string) error {
 		req.AssigneeID = &assignee
 	}
 	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID), req, &struct{}{})
+}
+
+type ItemUpdates struct {
+	Content *string   `json:"content,omitempty"`
+	Labels  *[]string `json:"labels,omitempty"`
+}
+
+// UpdateItem updates an item.
+func (s *Syncer) UpdateItem(ctx context.Context, item Item, updates ItemUpdates) error {
+	// TODO: refresh the sync state?
+
+	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID), updates, &struct{}{})
 }
