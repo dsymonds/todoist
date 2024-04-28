@@ -299,6 +299,28 @@ func (ts *Syncer) post(ctx context.Context, path string, reqBody io.Reader, ct s
 	return nil
 }
 
+func (ts *Syncer) delete(ctx context.Context, path string) error {
+	req, err := http.NewRequestWithContext(ctx, "DELETE", "https://api.todoist.com"+path, nil)
+	if err != nil {
+		return fmt.Errorf("constructing HTTP request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+ts.apiToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	_, err = ioutil.ReadAll(resp.Body) // TODO: report/log this if there's a failure
+	resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf("reading API response body: %w", err)
+	}
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("API request returned %s", resp.Status)
+	}
+	return nil
+}
+
 // ProjectByName returns the named project.
 // This will only work after a Sync invocation.
 func (s *Syncer) ProjectByName(name string) (Project, bool) {
@@ -332,4 +354,8 @@ func (s *Syncer) UpdateItem(ctx context.Context, item Item, updates ItemUpdates)
 	// TODO: refresh the sync state?
 
 	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID), updates, &struct{}{})
+}
+
+func (s *Syncer) DeleteItem(ctx context.Context, item Item) error {
+	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID))
 }
