@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // See https://developer.todoist.com/sync/v9/ for the reference for types and protocols.
@@ -51,9 +53,11 @@ type Item struct {
 	Checked     bool    `json:"checked,omitempty"`
 	Due         *Due    `json:"due,omitempty"`
 
-	ParentID       string `json:"parent_id,omitempty"`
-	ChildRemaining int    `json:"-"`
-	ChildCompleted int    `json:"-"`
+	ParentID   string `json:"parent_id,omitempty"`
+	ChildOrder int    `json:"child_order,omitempty"`
+
+	ChildRemaining int `json:"-"`
+	ChildCompleted int `json:"-"`
 }
 
 // Due represents a task's due date, in a few different possible formats.
@@ -358,4 +362,42 @@ func (s *Syncer) UpdateItem(ctx context.Context, item Item, updates ItemUpdates)
 
 func (s *Syncer) DeleteItem(ctx context.Context, item Item) error {
 	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID))
+}
+
+// https://developer.todoist.com/sync/v9/#write-resources
+type command struct {
+	Type string      `json:"type"`
+	Args interface{} `json:"args"`
+	UUID string      `json:"uuid"`
+}
+
+func (s *Syncer) postCommands(ctx context.Context, commands []command) error {
+	b, err := json.Marshal(commands)
+	if err != nil {
+		return fmt.Errorf("marshaling JSON body: %w", err)
+	}
+	// TODO: grab response? it isn't well documented and I can't see
+	// anything that suggests it even carries error messages.
+	return s.postForm(ctx, "/sync/v9/sync", url.Values{
+		"commands": []string{string(b)},
+	}, &struct{}{})
+}
+
+func (s *Syncer) Reorder(ctx context.Context, itemIDs []string) error {
+	type item struct {
+		ID string `json:"id"`
+		CO int    `json:"child_order"`
+	}
+	var items []item
+	for i, id := range itemIDs {
+		// child_order numbers from 1.
+		items = append(items, item{ID: id, CO: i + 1})
+	}
+	return s.postCommands(ctx, []command{{
+		Type: "item_reorder",
+		Args: struct {
+			Items []item `json:"items"`
+		}{items},
+		UUID: uuid.NewString(),
+	}})
 }
