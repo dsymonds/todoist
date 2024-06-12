@@ -354,14 +354,14 @@ type ItemUpdates struct {
 }
 
 // UpdateItem updates an item.
-func (s *Syncer) UpdateItem(ctx context.Context, item Item, updates ItemUpdates) error {
+func (s *Syncer) UpdateItem(ctx context.Context, itemID string, updates ItemUpdates) error {
 	// TODO: refresh the sync state?
 
-	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID), updates, &struct{}{})
+	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(itemID), updates, &struct{}{})
 }
 
-func (s *Syncer) DeleteItem(ctx context.Context, item Item) error {
-	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID))
+func (s *Syncer) DeleteItem(ctx context.Context, itemID string) error {
+	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(itemID))
 }
 
 // https://developer.todoist.com/sync/v9/#write-resources
