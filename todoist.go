@@ -40,8 +40,8 @@ type Collaborator struct {
 	FullName string `json:"full_name"`
 }
 
-// Item represents a Todoist item (task).
-type Item struct {
+// Task represents a Todoist task.
+type Task struct {
 	ID          string   `json:"id,omitempty"`
 	ProjectID   string   `json:"project_id,omitempty"`
 	Content     string   `json:"content,omitempty"`     // title of task
@@ -145,7 +145,7 @@ type Syncer struct {
 	syncToken     string
 	Projects      map[string]Project
 	Collaborators map[string]Collaborator
-	Items         map[string]Item // Only incomplete (TODO: relax this)
+	Tasks         map[string]Task // Only incomplete (TODO: relax this)
 }
 
 func NewSyncer(apiToken string) *Syncer {
@@ -170,7 +170,7 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		FullSync      bool           `json:"full_sync"`
 		Projects      []Project      `json:"projects"`
 		Collaborators []Collaborator `json:"collaborators"`
-		Items         []Item         `json:"items"`
+		Tasks         []Task         `json:"items"`
 		Completed     []compInfo     `json:"completed_info"`
 	}
 	err := ts.postForm(ctx, "/sync/v9/sync", url.Values{
@@ -186,7 +186,7 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		// Server says this is a full sync, or this is the first sync we've attempted.
 		ts.Projects = make(map[string]Project)
 		ts.Collaborators = make(map[string]Collaborator)
-		ts.Items = make(map[string]Item)
+		ts.Tasks = make(map[string]Task)
 	}
 	for _, p := range data.Projects {
 		// TODO: Handle deletions. This is pretty uncommon.
@@ -196,70 +196,70 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		// TODO: Handle deletions. It's uncommon.
 		ts.Collaborators[c.ID] = c
 	}
-	for _, item := range data.Items {
-		if item.Checked {
-			delete(ts.Items, item.ID)
+	for _, task := range data.Tasks {
+		if task.Checked {
+			delete(ts.Tasks, task.ID)
 		} else {
-			if item.Due != nil {
-				item.Due.update()
+			if task.Due != nil {
+				task.Due.update()
 			}
-			ts.Items[item.ID] = item
+			ts.Tasks[task.ID] = task
 		}
 	}
 	for _, comp := range data.Completed {
-		if comp.ItemID == "" { // only handle completion counts for items
+		if comp.ItemID == "" { // only handle completion counts for tasks
 			continue
 		}
-		item, ok := ts.Items[comp.ItemID]
+		task, ok := ts.Tasks[comp.ItemID]
 		if !ok {
 			// This really shouldn't happen.
-			// TODO: Or can it happen for completed items?
-			log.Printf("WARNING: Todoist reported completion info for unknown item %s", comp.ItemID)
+			// TODO: Or can it happen for completed tasks?
+			log.Printf("WARNING: Todoist reported completion info for unknown task %s", comp.ItemID)
 			continue
 		}
-		item.ChildCompleted = comp.NumItems
-		ts.Items[comp.ItemID] = item
+		task.ChildCompleted = comp.NumItems
+		ts.Tasks[comp.ItemID] = task
 	}
 	ts.syncToken = data.SyncToken
 
 	// Recompute pending children.
-	for id, item := range ts.Items {
-		item.ChildRemaining = 0
-		ts.Items[id] = item
+	for id, task := range ts.Tasks {
+		task.ChildRemaining = 0
+		ts.Tasks[id] = task
 	}
-	for _, item := range ts.Items {
-		if item.ParentID == "" { // TODO: skip checked if we start tracking them
+	for _, task := range ts.Tasks {
+		if task.ParentID == "" { // TODO: skip checked if we start tracking them
 			continue
 		}
-		p, ok := ts.Items[item.ParentID]
+		p, ok := ts.Tasks[task.ParentID]
 		if !ok {
 			// This really shouldn't happen.
-			// TODO: Or can it happen for completed items?
-			log.Printf("WARNING: Todoist item %q has parent %s that we don't know about", item.Content, item.ParentID)
+			// TODO: Or can it happen for completed task?
+			log.Printf("WARNING: Todoist task %q has parent %s that we don't know about", task.Content, task.ParentID)
 			continue
 		}
 		p.ChildRemaining++
-		ts.Items[item.ParentID] = p
+		ts.Tasks[task.ParentID] = p
 	}
 
 	return nil
 }
 
-// CreateItem creates an item, without going through the full sync workflow.
-func (ts *Syncer) CreateItem(ctx context.Context, item Item) error {
+// CreateTask creates a task, without going through the full sync workflow.
+func (ts *Syncer) CreateTask(ctx context.Context, task Task) error {
 	vs := url.Values{
-		"content":    []string{item.Content},
-		"project_id": []string{item.ProjectID},
-		"priority":   []string{strconv.Itoa(item.Priority)},
+		"content":    []string{task.Content},
+		"project_id": []string{task.ProjectID},
+		"priority":   []string{strconv.Itoa(task.Priority)},
 	}
-	if item.Description != "" {
-		vs.Set("description", item.Description)
+	if task.Description != "" {
+		vs.Set("description", task.Description)
 	}
-	if item.Due != nil {
-		vs.Set("due_datetime", item.Due.Date)
+	if task.Due != nil {
+		vs.Set("due_datetime", task.Due.Date)
 	}
-	if item.Responsible != nil {
-		vs.Set("assignee_id", *item.Responsible)
+	if task.Responsible != nil {
+		vs.Set("assignee_id", *task.Responsible)
 	}
 	err := ts.postForm(ctx, "/rest/v2/tasks", vs, &struct{}{})
 	return err
@@ -337,31 +337,31 @@ func (s *Syncer) ProjectByName(name string) (Project, bool) {
 }
 
 // Assign assigns a task to the given UID.
-// If it is the empty string, the item is unassigned.
-func (s *Syncer) Assign(ctx context.Context, item Item, assignee string) error {
+// If it is the empty string, the task is unassigned.
+func (s *Syncer) Assign(ctx context.Context, task Task, assignee string) error {
 	var req struct {
 		AssigneeID *string `json:"assignee_id"`
 	}
 	if assignee != "" {
 		req.AssigneeID = &assignee
 	}
-	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(item.ID), req, &struct{}{})
+	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(task.ID), req, &struct{}{})
 }
 
-type ItemUpdates struct {
+type TaskUpdates struct {
 	Content *string   `json:"content,omitempty"`
 	Labels  *[]string `json:"labels,omitempty"`
 }
 
-// UpdateItem updates an item.
-func (s *Syncer) UpdateItem(ctx context.Context, itemID string, updates ItemUpdates) error {
+// UpdateTask updates a task.
+func (s *Syncer) UpdateTask(ctx context.Context, taskID string, updates TaskUpdates) error {
 	// TODO: refresh the sync state?
 
-	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(itemID), updates, &struct{}{})
+	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(taskID), updates, &struct{}{})
 }
 
-func (s *Syncer) DeleteItem(ctx context.Context, itemID string) error {
-	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(itemID))
+func (s *Syncer) DeleteTask(ctx context.Context, taskID string) error {
+	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(taskID))
 }
 
 // https://developer.todoist.com/sync/v9/#write-resources
@@ -383,21 +383,21 @@ func (s *Syncer) postCommands(ctx context.Context, commands []command) error {
 	}, &struct{}{})
 }
 
-func (s *Syncer) Reorder(ctx context.Context, itemIDs []string) error {
-	type item struct {
+func (s *Syncer) Reorder(ctx context.Context, taskIDs []string) error {
+	type task struct {
 		ID string `json:"id"`
 		CO int    `json:"child_order"`
 	}
-	var items []item
-	for i, id := range itemIDs {
+	var tasks []task
+	for i, id := range taskIDs {
 		// child_order numbers from 1.
-		items = append(items, item{ID: id, CO: i + 1})
+		tasks = append(tasks, task{ID: id, CO: i + 1})
 	}
 	return s.postCommands(ctx, []command{{
 		Type: "item_reorder",
 		Args: struct {
-			Items []item `json:"items"`
-		}{items},
+			Tasks []task `json:"items"`
+		}{tasks},
 		UUID: uuid.NewString(),
 	}})
 }
