@@ -15,7 +15,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -247,21 +246,30 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 
 // CreateTask creates a task, without going through the full sync workflow.
 func (ts *Syncer) CreateTask(ctx context.Context, task Task) error {
-	vs := url.Values{
-		"content":    []string{task.Content},
-		"project_id": []string{task.ProjectID},
-		"priority":   []string{strconv.Itoa(task.Priority)},
-	}
-	if task.Description != "" {
-		vs.Set("description", task.Description)
+	req := struct {
+		Content     string `json:"content"`
+		Description string `json:"description,omitempty"`
+		ProjectID   string `json:"project_id,omitempty"`
+		// skipping section_id, parent_id, order
+		Labels   []string `json:"labels,omitempty"` // only seems to set the first label...
+		Priority int      `json:"priority,omitempty"`
+		// Only support one type of due:
+		DueString  string `json:"due_string,omitempty"`
+		AssigneeID string `json:"assignee_id,omitempty"`
+	}{
+		Content:     task.Content,
+		Description: task.Description,
+		ProjectID:   task.ProjectID,
+		Labels:      task.Labels,
+		Priority:    task.Priority,
 	}
 	if task.Due != nil {
-		vs.Set("due_datetime", task.Due.Date)
+		req.DueString = task.Due.Date
 	}
 	if task.Responsible != nil {
-		vs.Set("assignee_id", *task.Responsible)
+		req.AssigneeID = *task.Responsible
 	}
-	err := ts.postForm(ctx, "/rest/v2/tasks", vs, &struct{}{})
+	err := ts.postJSON(ctx, "/rest/v2/tasks", &req, &struct{}{})
 	return err
 }
 
