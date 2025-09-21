@@ -336,6 +336,15 @@ func (s *Syncer) ProjectByName(name string) (Project, bool) {
 	return Project{}, false
 }
 
+func (s *Syncer) CollaboratorByEmail(email string) (Collaborator, bool) {
+	for _, col := range s.Collaborators {
+		if col.Email == email {
+			return col, true
+		}
+	}
+	return Collaborator{}, false
+}
+
 // Assign assigns a task to the given UID.
 // If it is the empty string, the task is unassigned.
 func (s *Syncer) Assign(ctx context.Context, task Task, assignee string) error {
