@@ -21,14 +21,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// See https://developer.todoist.com/sync/v9/ for the reference for types and protocols.
+// See https://developer.todoist.com/api/v1 for the reference for types and protocols.
 // https://developer.todoist.com/rest/v2/ is also used for several operations.
 
 // Project represents a Todoist project.
 type Project struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
-	Shared bool   `json:"shared"`
+	Shared bool   `json:"is_shared"`
 }
 
 // Collaborator represents a Todoist collaborator.
@@ -156,7 +156,7 @@ func NewSyncer(apiToken string) *Syncer {
 
 // Sync triggers a synchronisation of data, doing a partial sync where possible.
 func (ts *Syncer) Sync(ctx context.Context) error {
-	type compInfo struct {
+	type compInfo struct { // TODO: haven't verified this works with v1 API
 		// One of these should be set:
 		ProjectID string `json:"project_id"`
 		SectionID string `json:"section_id"`
@@ -172,7 +172,7 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		Tasks         []Task         `json:"items"`
 		Completed     []compInfo     `json:"completed_info"`
 	}
-	err := ts.postForm(ctx, "/sync/v9/sync", url.Values{
+	err := ts.postForm(ctx, "/api/v1/sync", url.Values{
 		"sync_token": []string{ts.syncToken},
 		// TODO: sync more, and permit configuring what things to sync.
 		"resource_types": []string{`["projects","items","collaborators","completed_info"]`},
