@@ -22,7 +22,6 @@ import (
 )
 
 // See https://developer.todoist.com/api/v1 for the reference for types and protocols.
-// https://developer.todoist.com/rest/v2/ is also used for several operations.
 
 // Project represents a Todoist project.
 type Project struct {
@@ -381,7 +380,7 @@ func (s *Syncer) DeleteTask(ctx context.Context, taskID string) error {
 	return s.delete(ctx, "/api/v1/tasks/"+url.PathEscape(taskID))
 }
 
-// https://developer.todoist.com/sync/v9/#write-resources
+// https://developer.todoist.com/api/v1#tag/Sync/Overview/Write-resources
 type command struct {
 	Type string      `json:"type"`
 	Args interface{} `json:"args"`
@@ -395,13 +394,12 @@ func (s *Syncer) postCommands(ctx context.Context, commands []command) error {
 	}
 	// TODO: grab response? it isn't well documented and I can't see
 	// anything that suggests it even carries error messages.
-	return s.postForm(ctx, "/sync/v9/sync", url.Values{
+	return s.postForm(ctx, "/api/v1/sync", url.Values{
 		"commands": []string{string(b)},
 	}, &struct{}{})
 }
 
 func (s *Syncer) Reorder(ctx context.Context, taskIDs []string) error {
-	// TODO: Port to v1
 	type task struct {
 		ID string `json:"id"`
 		CO int    `json:"child_order"`
