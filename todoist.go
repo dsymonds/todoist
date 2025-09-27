@@ -372,10 +372,9 @@ type TaskUpdates struct {
 
 // UpdateTask updates a task.
 func (s *Syncer) UpdateTask(ctx context.Context, taskID string, updates TaskUpdates) error {
-	// TODO: Port to v1
 	// TODO: refresh the sync state?
 
-	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(taskID), updates, &struct{}{})
+	return s.postJSON(ctx, "/api/v1/tasks/"+url.PathEscape(taskID), updates, &struct{}{})
 }
 
 func (s *Syncer) DeleteTask(ctx context.Context, taskID string) error {
