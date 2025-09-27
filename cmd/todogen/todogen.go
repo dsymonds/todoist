@@ -190,6 +190,10 @@ func (d *due) apply(dm DueMod) error {
 		}
 		d.t = &t
 	}
+	if dm.PrevWeekday != nil {
+		delta := int(d.d.Weekday() - time.Weekday(*dm.PrevWeekday))
+		d.d = d.d.AddDays(-delta)
+	}
 
 	return nil
 }
