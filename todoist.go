@@ -354,16 +354,15 @@ func (s *Syncer) CollaboratorByEmail(email string) (Collaborator, bool) {
 }
 
 // Assign assigns a task to the given UID.
-// If it is the empty string, the task is unassigned.
-func (s *Syncer) Assign(ctx context.Context, task Task, assignee string) error {
-	// TODO: Port to v1
+// If assignee is the empty string, the task is unassigned.
+func (s *Syncer) Assign(ctx context.Context, taskID, assignee string) error {
 	var req struct {
 		AssigneeID *string `json:"assignee_id"`
 	}
 	if assignee != "" {
 		req.AssigneeID = &assignee
 	}
-	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(task.ID), req, &struct{}{})
+	return s.postJSON(ctx, "/api/v1/tasks/"+url.PathEscape(taskID), req, &struct{}{})
 }
 
 type TaskUpdates struct {
