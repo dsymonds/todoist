@@ -378,8 +378,7 @@ func (s *Syncer) UpdateTask(ctx context.Context, taskID string, updates TaskUpda
 }
 
 func (s *Syncer) DeleteTask(ctx context.Context, taskID string) error {
-	// TODO: Port to v1
-	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(taskID))
+	return s.delete(ctx, "/api/v1/tasks/"+url.PathEscape(taskID))
 }
 
 // https://developer.todoist.com/sync/v9/#write-resources
