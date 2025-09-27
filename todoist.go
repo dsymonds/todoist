@@ -269,7 +269,7 @@ func (ts *Syncer) CreateTask(ctx context.Context, task Task) error {
 	if task.Responsible != nil {
 		req.AssigneeID = *task.Responsible
 	}
-	err := ts.postJSON(ctx, "/rest/v2/tasks", &req, &struct{}{})
+	err := ts.postJSON(ctx, "/api/v1/tasks", &req, &struct{}{})
 	return err
 }
 
@@ -356,6 +356,7 @@ func (s *Syncer) CollaboratorByEmail(email string) (Collaborator, bool) {
 // Assign assigns a task to the given UID.
 // If it is the empty string, the task is unassigned.
 func (s *Syncer) Assign(ctx context.Context, task Task, assignee string) error {
+	// TODO: Port to v1
 	var req struct {
 		AssigneeID *string `json:"assignee_id"`
 	}
@@ -372,12 +373,14 @@ type TaskUpdates struct {
 
 // UpdateTask updates a task.
 func (s *Syncer) UpdateTask(ctx context.Context, taskID string, updates TaskUpdates) error {
+	// TODO: Port to v1
 	// TODO: refresh the sync state?
 
 	return s.postJSON(ctx, "/rest/v2/tasks/"+url.PathEscape(taskID), updates, &struct{}{})
 }
 
 func (s *Syncer) DeleteTask(ctx context.Context, taskID string) error {
+	// TODO: Port to v1
 	return s.delete(ctx, "/rest/v2/tasks/"+url.PathEscape(taskID))
 }
 
@@ -401,6 +404,7 @@ func (s *Syncer) postCommands(ctx context.Context, commands []command) error {
 }
 
 func (s *Syncer) Reorder(ctx context.Context, taskIDs []string) error {
+	// TODO: Port to v1
 	type task struct {
 		ID string `json:"id"`
 		CO int    `json:"child_order"`
