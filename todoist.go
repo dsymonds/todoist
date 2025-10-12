@@ -411,16 +411,22 @@ type command struct {
 	TempID string      `json:"temp_id,omitempty"`
 }
 
-func (s *Syncer) postCommands(ctx context.Context, commands []command) error {
+type commandResp struct {
+	SyncStatus map[string]json.RawMessage `json:"sync_status"` // keys are the UUID of the command
+}
+
+func (s *Syncer) postCommands(ctx context.Context, commands []command) (commandResp, error) {
 	b, err := json.Marshal(commands)
 	if err != nil {
-		return fmt.Errorf("marshaling JSON body: %w", err)
+		return commandResp{}, fmt.Errorf("marshaling JSON body: %w", err)
 	}
-	// TODO: grab response? it isn't well documented and I can't see
-	// anything that suggests it even carries error messages.
-	return s.postForm(ctx, "/api/v1/sync", url.Values{
+	var resp commandResp
+	if err := s.postForm(ctx, "/api/v1/sync", url.Values{
 		"commands": []string{string(b)},
-	}, &struct{}{})
+	}, &resp); err != nil {
+		return commandResp{}, err
+	}
+	return resp, nil
 }
 
 func (s *Syncer) Reorder(ctx context.Context, taskIDs []string) error {
@@ -433,20 +439,35 @@ func (s *Syncer) Reorder(ctx context.Context, taskIDs []string) error {
 		// child_order numbers from 1.
 		tasks = append(tasks, task{ID: id, CO: i + 1})
 	}
-	return s.postCommands(ctx, []command{{
+	// TODO: check response for a semantic error
+	_, err := s.postCommands(ctx, []command{{
 		Type: "item_reorder",
 		Args: struct {
 			Tasks []task `json:"items"`
 		}{tasks},
 		UUID: uuid.NewString(),
 	}})
+	return err
 }
 
 func (s *Syncer) AddReminder(ctx context.Context, rem Reminder) error {
-	return s.postCommands(ctx, []command{{
+	uu := uuid.NewString()
+	resp, err := s.postCommands(ctx, []command{{
 		Type:   "reminder_add",
 		TempID: uuid.NewString(), // required for this one; unused otherwise
-		UUID:   uuid.NewString(),
+		UUID:   uu,
 		Args:   rem,
 	}})
+	if err != nil {
+		return err
+	}
+	res, ok := resp.SyncStatus[uu]
+	if !ok {
+		// This shouldn't happen!
+		return fmt.Errorf("response sync_status did not contain our UUID")
+	}
+	if bytes.Equal(res, []byte(`"ok"`)) {
+		return nil
+	}
+	return fmt.Errorf("sync_status: %s", res)
 }
