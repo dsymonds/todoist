@@ -58,6 +58,22 @@ type Task struct {
 	ChildCompleted int `json:"-"`
 }
 
+// Reminder represents a reminder for a task.
+type Reminder struct {
+	ID     string `json:"id,omitempty"`
+	TaskID string `json:"item_id"`
+	UserID string `json:"notify_uid,omitempty"`
+
+	Type string `json:"type"` // "relative", "absolute", "location"
+
+	MinuteOffset *int `json:"minute_offset,omitempty"` // for type=relative; how long *before* the task is due
+
+	// TODO: Due (for type=absolute)
+	// TODO: location config
+
+	IsDeleted bool `json:"is_deleted,omitempty"`
+}
+
 // Due represents a task's due date, in a few different possible formats.
 type Due struct {
 	Date string `json:"date"` // YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or YYYY-MM-DDTHH:MM:SSZ
@@ -144,6 +160,7 @@ type Syncer struct {
 	Projects      map[string]Project
 	Collaborators map[string]Collaborator
 	Tasks         map[string]Task // Only incomplete (TODO: relax this)
+	Reminders     map[string]Reminder
 }
 
 func NewSyncer(apiToken string) *Syncer {
@@ -169,12 +186,13 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		Projects      []Project      `json:"projects"`
 		Collaborators []Collaborator `json:"collaborators"`
 		Tasks         []Task         `json:"items"`
+		Reminders     []Reminder     `json:"reminders"`
 		Completed     []compInfo     `json:"completed_info"`
 	}
 	err := ts.postForm(ctx, "/api/v1/sync", url.Values{
 		"sync_token": []string{ts.syncToken},
 		// TODO: sync more, and permit configuring what things to sync.
-		"resource_types": []string{`["projects","items","collaborators","completed_info"]`},
+		"resource_types": []string{`["projects","collaborators","items","reminders","completed_info"]`},
 	}, &data)
 	if err != nil {
 		return err
@@ -185,6 +203,7 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 		ts.Projects = make(map[string]Project)
 		ts.Collaborators = make(map[string]Collaborator)
 		ts.Tasks = make(map[string]Task)
+		ts.Reminders = make(map[string]Reminder)
 	}
 	for _, p := range data.Projects {
 		// TODO: Handle deletions. This is pretty uncommon.
@@ -203,6 +222,10 @@ func (ts *Syncer) Sync(ctx context.Context) error {
 			}
 			ts.Tasks[task.ID] = task
 		}
+	}
+	for _, rem := range data.Reminders {
+		// TODO: handle deletions? does that represent reminders that have fired?
+		ts.Reminders[rem.ID] = rem
 	}
 	for _, comp := range data.Completed {
 		if comp.ItemID == "" { // only handle completion counts for tasks
@@ -382,9 +405,10 @@ func (s *Syncer) DeleteTask(ctx context.Context, taskID string) error {
 
 // https://developer.todoist.com/api/v1#tag/Sync/Overview/Write-resources
 type command struct {
-	Type string      `json:"type"`
-	Args interface{} `json:"args"`
-	UUID string      `json:"uuid"`
+	Type   string      `json:"type"`
+	Args   interface{} `json:"args"`
+	UUID   string      `json:"uuid"`
+	TempID string      `json:"temp_id,omitempty"`
 }
 
 func (s *Syncer) postCommands(ctx context.Context, commands []command) error {
@@ -415,5 +439,14 @@ func (s *Syncer) Reorder(ctx context.Context, taskIDs []string) error {
 			Tasks []task `json:"items"`
 		}{tasks},
 		UUID: uuid.NewString(),
+	}})
+}
+
+func (s *Syncer) AddReminder(ctx context.Context, rem Reminder) error {
+	return s.postCommands(ctx, []command{{
+		Type:   "reminder_add",
+		TempID: uuid.NewString(), // required for this one; unused otherwise
+		UUID:   uuid.NewString(),
+		Args:   rem,
 	}})
 }
