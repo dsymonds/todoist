@@ -101,7 +101,7 @@ func main() {
 		d := d0
 		for i, dm := range task.Due {
 			if err := d.apply(dm); err != nil {
-				log.Fatalf("Applying due[%d] for %q: %w", i, task.Content, err)
+				log.Fatalf("Applying due[%d] for %q: %v", i, task.Content, err)
 			}
 		}
 		ttask.Due = &todoist.Due{Date: d.String()}
@@ -192,6 +192,9 @@ func (d *due) apply(dm DueMod) error {
 	}
 	if dm.PrevWeekday != nil {
 		delta := int(d.d.Weekday() - time.Weekday(*dm.PrevWeekday))
+		if delta < 0 {
+			delta += 7
+		}
 		d.d = d.d.AddDays(-delta)
 	}
 
