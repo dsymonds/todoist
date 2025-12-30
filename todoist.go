@@ -69,7 +69,13 @@ type Reminder struct {
 	MinuteOffset *int `json:"minute_offset,omitempty"` // for type=relative; how long *before* the task is due
 
 	// TODO: Due (for type=absolute)
-	// TODO: location config
+
+	// For type=location:
+	Name            string `json:"name,omitempty"`
+	Latitude        string `json:"loc_lat,omitempty"`     // string form of decimal degrees
+	Longitude       string `json:"loc_long,omitempty"`    // ditto
+	LocationTrigger string `json:"loc_trigger,omitempty"` // "on_enter", "on_leave"
+	Radius          int    `json:"radius,omitempty"`      // in metres
 
 	IsDeleted bool `json:"is_deleted,omitempty"`
 }
