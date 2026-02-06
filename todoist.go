@@ -67,8 +67,7 @@ type Reminder struct {
 	Type string `json:"type"` // "relative", "absolute", "location"
 
 	MinuteOffset *int `json:"minute_offset,omitempty"` // for type=relative; how long *before* the task is due
-
-	// TODO: Due (for type=absolute)
+	Due          *Due `json:"due,omitempty"`           // for type=absolute; must be date+time
 
 	// For type=location:
 	Name            string `json:"name,omitempty"`
