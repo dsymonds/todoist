@@ -65,15 +65,24 @@ func main() {
 		log.Fatalf("Getting Todoist state: %v", err)
 	}
 
-	proj, ok := ts.ProjectByName(prog.Project)
-	if !ok {
-		log.Fatalf("Didn't find a Todoist project named %q", prog.Project)
+	projs := make(map[string]string) // name => ID
+	for id, proj := range ts.Projects {
+		projs[proj.Name] = id
 	}
 
 	var toAdd []todoist.Task
 	for _, task := range prog.Tasks {
+		projName := prog.Project
+		if task.Project != "" {
+			projName = task.Project
+		}
+		projID, ok := projs[projName]
+		if !ok {
+			log.Fatalf("Didn't find a Todoist project named %q", projName)
+		}
+
 		ttask := todoist.Task{
-			ProjectID: proj.ID,
+			ProjectID: projID,
 			// Content, Description are templated
 			Priority: task.Priority,
 			Labels:   task.Labels,
@@ -157,6 +166,7 @@ type Program struct {
 }
 
 type Task struct {
+	Project     string   `yaml:"project"` // if different to the containing program
 	Content     string   `yaml:"content"`
 	Description string   `yaml:"description"` // optional
 	Priority    int      `yaml:"priority"`    // 1=lowest, 4=highest
